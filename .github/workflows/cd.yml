@@ -1,50 +1,50 @@
-name: Continuous Deployment
+name: CD - Deploy Iris API to GKE
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       # 1. Checkout code
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
       # 2. Authenticate with GCP
-      - name: Set up gcloud
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}   # base64 decoded JSON key
+
+      # 3. Setup gcloud CLI
+      - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
         with:
-          project_id: YOUR_PROJECT
-          service_account_key: ${{ secrets.GCP_CREDENTIALS }}
-          export_default_credentials: true
+          project_id: logical-river-338214
+          install_components: 'kubectl'
 
-      # 3. Configure Docker for Artifact Registry
-      - name: Configure Docker auth
+      # 4. Configure Docker to use Artifact Registry
+      - name: Configure Docker
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
-      # 4. Build & Push Docker Image
-      - name: Build and Push Docker image
+      # 5. Build and push Docker image
+      - name: Build and push Docker image
         run: |
-          docker build -t us-central1-docker.pkg.dev/YOUR_PROJECT/my-repo/iris-api:latest .
-          docker push us-central1-docker.pkg.dev/YOUR_PROJECT/my-repo/iris-api:latest
+          IMAGE=us-central1-docker.pkg.dev/logical-river-338214/my-repo/iris-api:latest
+          docker build -t $IMAGE .
+          docker push $IMAGE
 
-      # 5. Get GKE credentials
+      # 6. Get GKE credentials
       - name: Get GKE credentials
         run: |
-          gcloud container clusters get-credentials gke-cluster-k8s-mlops --zone us-central1
+          gcloud container clusters get-credentials gke-cluster-k8s-mlops --zone us-central1 --project logical-river-338214
 
-      # 6. Deploy to Kubernetes
-      - name: Apply Kubernetes manifests
+      # 7. Deploy to Kubernetes
+      - name: Deploy to GKE
         run: |
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
-
-      # 7. Wait for LoadBalancer and test
-      - name: Verify deployment
-        run: |
-          sleep 60
-          EXTERNAL_IP=$(kubectl get svc iris-api-service --output jsonpath='{.status.loadBalancer.ingress[0].ip}')
-          echo "External IP is $EXTERNAL_IP"
-          curl -v http://$EXTERNAL_IP/
