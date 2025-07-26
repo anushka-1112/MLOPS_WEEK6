@@ -1,0 +1,50 @@
+name: Continuous Deployment
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. Authenticate with GCP
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: YOUR_PROJECT
+          service_account_key: ${{ secrets.GCP_CREDENTIALS }}
+          export_default_credentials: true
+
+      # 3. Configure Docker for Artifact Registry
+      - name: Configure Docker auth
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+
+      # 4. Build & Push Docker Image
+      - name: Build and Push Docker image
+        run: |
+          docker build -t us-central1-docker.pkg.dev/YOUR_PROJECT/my-repo/iris-api:latest .
+          docker push us-central1-docker.pkg.dev/YOUR_PROJECT/my-repo/iris-api:latest
+
+      # 5. Get GKE credentials
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials gke-cluster-k8s-mlops --zone us-central1
+
+      # 6. Deploy to Kubernetes
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/service.yaml
+
+      # 7. Wait for LoadBalancer and test
+      - name: Verify deployment
+        run: |
+          sleep 60
+          EXTERNAL_IP=$(kubectl get svc iris-api-service --output jsonpath='{.status.loadBalancer.ingress[0].ip}')
+          echo "External IP is $EXTERNAL_IP"
+          curl -v http://$EXTERNAL_IP/
