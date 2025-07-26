@@ -43,7 +43,9 @@ jobs:
         with:
           project_id: logical-river-338214
           install_components: 'kubectl'
-
+      - name: Download model from GCS
+        run: |
+          gsutil cp gs://mlops-course-803234401672-week1/my-models/iris-classifier-week-1/model.joblib ./model.joblib
       # 4. Configure Docker to use Artifact Registry
       - name: Configure Docker
         run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
