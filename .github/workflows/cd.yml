@@ -69,51 +69,38 @@ jobs:
         run: |
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
-      - name: Wait for External IP and Test API
+      - name: Wait for Pod Ready, External IP and Test API
         run: |
-          echo "Waiting for External IP of Service: iris-api-deployment"
-
-          # Wait for external IP (timeout 5 mins)
+          echo "Waiting for Pod to become Ready..."
           for i in {1..30}; do
-            EXTERNAL_IP=$(kubectl get svc iris-api-deployment \
-              -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+            POD_STATUS=$(kubectl get pods -l app=iris-api -o jsonpath='{.items[0].status.containerStatuses[0].ready}' 2>/dev/null || echo "false")
+            if [ "$POD_STATUS" == "true" ]; then
+              echo "Pod is Ready!"
+              break
+            fi
+            echo "Pod not ready yet... ($i/30)"
+            sleep 10
+          done
+
+          echo "Waiting for External IP..."
+          for i in {1..30}; do
+            EXTERNAL_IP=$(kubectl get svc iris-api-deployment -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
             if [ -n "$EXTERNAL_IP" ]; then
               echo "External IP acquired: $EXTERNAL_IP"
               break
             fi
-            echo "Still waiting for external IP... ($i/30)"
+            echo "Still waiting for External IP... ($i/30)"
             sleep 10
           done
 
           if [ -z "$EXTERNAL_IP" ]; then
-            echo "❌ Failed to get external IP after 5 minutes"
+            echo "❌ Failed to get External IP after 5 minutes"
             exit 1
           fi
 
-          echo "Checking pod readiness..."
-
-          # Wait for pods to be in 1/1 Running state (timeout 3 mins)
-          for i in {1..18}; do
-            POD_STATUS=$(kubectl get pods -l app=iris-api -o jsonpath='{.items[0].status.containerStatuses[0].ready}')
-            if [ "$POD_STATUS" == "true" ]; then
-              echo "Pod is ready."
-              break
-            fi
-            echo "Pod not ready yet... ($i/18)"
-            sleep 10
-          done
-
-          if [ "$POD_STATUS" != "true" ]; then
-            echo "❌ Pod did not become ready in time."
-            kubectl get pods -l app=iris-api
-            exit 1
-          fi
-
-          # Test GET endpoint
-          echo "Testing GET / endpoint..."
+          echo "Testing GET endpoint..."
           curl -f "http://$EXTERNAL_IP/" || exit 1
 
-          # Test POST /predict/ endpoint with sample input
           echo "Testing POST /predict/ endpoint..."
           curl -X POST "http://$EXTERNAL_IP/predict/" \
             -H "Content-Type: application/json" \
