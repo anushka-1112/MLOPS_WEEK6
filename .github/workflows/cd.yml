@@ -69,7 +69,7 @@ jobs:
         run: |
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
-      - name: Wait for Pod Ready, External IP and Test API
+      - name: Wait for Pod Ready, Extract External IP and Test API
         run: |
           echo "Waiting for Pod to become Ready..."
           for i in {1..30}; do
