@@ -84,7 +84,7 @@ jobs:
 
           echo "Waiting for External IP..."
           for i in {1..60}; do
-            EXTERNAL_IP=$(kubectl get svc iris-api-deployment -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+            EXTERNAL_IP=$(kubectl get svc iris-api-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
             if [ -n "$EXTERNAL_IP" ]; then
               echo "External IP acquired: $EXTERNAL_IP"
               break
