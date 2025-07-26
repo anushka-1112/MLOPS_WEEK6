@@ -16,9 +16,26 @@ jobs:
 
       # 2. Authenticate with GCP
       - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}   # base64 decoded JSON key
+        env:
+          GCP_B64: ${{ secrets.GCP_KEY_JSON }}
+        run: |
+          set -e
+          echo "$GCP_B64" | base64 -d > gcp-key.json
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/gcp-key.json" >> $GITHUB_ENV
+          export GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/gcp-key.json
+          
+          echo "✓ Decoded service account key"
+          python3 -m json.tool gcp-key.json > /dev/null && echo "✓ Valid JSON"
+          echo "Installing Google Cloud CLI..."
+          sudo apt-get update && sudo apt-get install -y google-cloud-cli
+          
+          echo "Authenticating with GCP..."
+          gcloud auth activate-service-account --key-file=gcp-key.json
+          
+          # Set up application default credentials correctly
+          echo "Setting up application default credentials..."
+          gcloud auth application-default print-access-token > /dev/null 2>&1 || \
+          GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/gcp-key.json gcloud auth application-default login --no-launch-browser --quiet || true
 
       # 3. Setup gcloud CLI
       - name: Setup gcloud
