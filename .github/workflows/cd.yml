@@ -54,14 +54,19 @@ jobs:
           IMAGE=us-central1-docker.pkg.dev/logical-river-338214/my-repo/iris-api:latest
           docker build -t $IMAGE .
           docker push $IMAGE
-
       # 6. Get GKE credentials
       - name: Get GKE credentials
         run: |
           gcloud container clusters get-credentials gke-cluster-k8s-mlops --zone us-central1 --project logical-river-338214
-
+      - name: Verify GKE cluster access
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
       # 7. Deploy to Kubernetes
       - name: Deploy to GKE
         run: |
           kubectl apply -f k8s/deployment.yaml
           kubectl apply -f k8s/service.yaml
+      - name: Wait for external IP
+        run: |
+          kubectl get svc model-deployment-mlops-workload-service --watch
